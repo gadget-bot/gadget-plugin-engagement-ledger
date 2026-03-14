@@ -25,11 +25,11 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
 6. Include top-level messages and thread replies as valid contexts.
 7. Exclude edits from award parsing and crediting.
 8. `--` never removes points; trigger playful/quippy consumer response only.
-9. Attempting to award Penny triggers playful/quippy consumer response only.
+9. Attempting to award the consuming bot triggers playful/quippy consumer response only.
 10. Protect against double-credit with idempotency keys.
 11. Run monthly active-user awards:
     - default `10` points per active user, configurable by plugin consumer
-    - active user = posted top-level message or thread reply in Penny-enabled channels in that month
+    - active user = posted top-level message or thread reply in channels in that month where the bot is a member
     - inactive users receive nothing
     - timezone boundary mode configurable per workspace: `workspace_local` or `utc`
 12. Publish weekly leaderboard per workspace to a configurable channel.
