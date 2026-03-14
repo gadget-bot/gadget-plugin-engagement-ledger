@@ -24,8 +24,8 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
    - bot-originated messages
 6. Include top-level messages and thread replies as valid contexts.
 7. Exclude edits from award parsing and crediting.
-8. `--` never removes points; trigger playful/quippy Penny response only.
-9. Attempting to award Penny triggers playful/quippy Penny response only.
+8. `--` never removes points; trigger playful/quippy consumer response only.
+9. Attempting to award Penny triggers playful/quippy consumer response only.
 10. Protect against double-credit with idempotency keys.
 11. Run monthly active-user awards:
     - default `10` points per active user, configurable by plugin consumer
