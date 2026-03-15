@@ -15,12 +15,12 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
    - mention syntax: `@user++` and `@user ++` (space optional)
    - slash command route (prefix-configurable)
 3. Support multiple recipients in one message; if a recipient appears more than once, award once.
-4. Net-neutral transfers only (sender decreases, recipient increases).
+4. Point awards are net-neutral transfers: sender balance decreases by 1, recipient balance increases by 1. Starting balance for all users is 0. Awards are rejected if the sender has insufficient balance.
 5. Reject and do not write transactions for:
    - self-awards
    - DM context
    - cross-workspace context
-   - suspended sender or suspended recipient
+   - deactivated sender or deactivated recipient (`deleted: true` in Slack's user object)
    - bot-originated messages
 6. Include top-level messages and thread replies as valid contexts.
 7. Exclude edits from award parsing and crediting.
@@ -32,17 +32,26 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
     - active user = posted top-level message or thread reply in channels in that month where the bot is a member
     - inactive users receive nothing
     - timezone boundary mode configurable per workspace: `workspace_local` or `utc`
-12. Publish weekly leaderboard per workspace to a configurable channel.
+    - requires `integrations.scheduler.enabled: true`; if the scheduler integration is disabled, monthly awards do not run
+    - activity is tracked by the plugin's own message event listener; when `integrations.chat_adapters.enabled: true`, normalized events from `gadget-plugin-chat-adapters` serve as an additional source; channel membership filtering is naturally enforced by Slack's event delivery model
+12. Publish weekly leaderboard per workspace to a configurable channel:
+    - publishes two ranked top-10 lists: (1) points received from peers (monthly bot grants excluded), (2) points given to other members
+    - each entry shows rank, display name, and point count
+    - default schedule: Monday at 08:00 UTC
+    - requires `integrations.scheduler.enabled: true`
 
 ## v1 Configuration
 - `commands.mode`: `top_level | subcommand`
 - `commands.prefix`: string (known prefix namespace)
+- `feedback.reaction`: string emoji name, default `+1`; posted as a reaction to the triggering message on successful award
 - `monthly_award.enabled`: boolean
 - `monthly_award.points`: integer, default `10`
 - `monthly_award.timezone_mode`: `workspace_local | utc`
 - `leaderboard.enabled`: boolean
 - `leaderboard.channel_id`: string
-- `transparency.enabled`: boolean
+- `leaderboard.post_day`: string, default `monday`
+- `leaderboard.post_time_utc`: string (HH:MM), default `08:00`
+- `transparency.enabled`: boolean — _definition TBD_
 - `integrations.spam_reports.enabled`: boolean
 - `integrations.scheduler.enabled`: boolean
 - `integrations.chat_adapters.enabled`: boolean
@@ -54,8 +63,7 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
   - Behavior: if `removed=true`, award first reporter exactly once.
 
 ### Emitted
-- `engagement.points.awarded`
-- `engagement.leaderboard.generated`
+Emitted event schemas are deferred to v2. The event system is designed to be additive: event emission hooks will be inserted into write paths without requiring structural changes when schemas are defined.
 
 All writes must be idempotent by `(event_id, source_id)` or equivalent dedupe key.
 
@@ -71,8 +79,10 @@ All writes must be idempotent by `(event_id, source_id)` or equivalent dedupe ke
 - Collusion detection signals.
 - Moderator override tools (reverse/freeze/exclude).
 - Native event subscription model.
-- Lurker exclusion heuristics beyond baseline activity checks.
+- Lurker exclusion heuristics beyond baseline activity checks (e.g. last-login signals via `team.accessLogs`).
 - Image leaderboard publishing with dashboard link.
+- Define and publish `engagement.points.awarded` event schema.
+- Define and publish `engagement.leaderboard.generated` event schema.
 
 ## Extractable Issues
 1. **Define ledger schema and idempotent write path**  
@@ -105,6 +115,108 @@ All writes must be idempotent by `(event_id, source_id)` or equivalent dedupe ke
 10. **Add collusion detection signals and moderator override controls**  
     Milestone: `v2-advanced-controls`  
     Labels: `type:feature`, `area:engagement`, `priority:p1`
-11. **Add reaction-based upvotes and native event subscription model**  
-    Milestone: `v2-advanced-controls`  
+11. **Add reaction-based upvotes and native event subscription model**
+    Milestone: `v2-advanced-controls`
     Labels: `type:feature`, `area:engagement`, `priority:p1`
+
+## Recommended Package Structure
+
+### Directory / File Tree
+
+```
+gadget-plugin-engagement-ledger/
+├── go.mod
+├── go.sum
+├── main.go                          # Wires plugin into a host bot; feature-flag optional integrations
+├── plugin/
+│   └── plugin.go                    # Public API surface: Register(bot) — the only symbol consumers import
+├── internal/
+│   ├── parser/
+│   │   └── mention.go               # Parse @user++ / @user ++ from message text; returns deduplicated recipient list
+│   ├── ledger/
+│   │   ├── models.go                # GORM models: Transaction, Balance, ActiveUserRecord
+│   │   ├── writer.go                # Idempotent write path; upserts Balance after each Transaction insert
+│   │   └── reader.go                # Leaderboard and balance queries
+│   ├── eligibility/
+│   │   └── rules.go                 # Enforce self/DM/cross-workspace/suspended/bot/edit exclusion rules
+│   ├── awards/
+│   │   └── monthly.go               # Monthly active-user award job; timezone boundary logic
+│   ├── leaderboard/
+│   │   └── publisher.go             # Weekly leaderboard formatting and Slack publish
+│   ├── handlers/
+│   │   ├── mention.go               # HandlerContext handler: parses message, awards points, posts feedback
+│   │   ├── command.go               # HandlerContext handler: slash-command award route
+│   │   └── quip.go                  # HandlerContext handler: playful responses for -- and bot-award attempts
+│   └── slackclient/
+│       └── client.go                # slack.Client wrapper interface for dependency injection
+└── docs/
+    └── specs/
+        └── gadget-plugin-engagement-ledger.md
+```
+
+### Handler Signature
+
+Handlers follow the `HandlerContext` style used in current Gadget core:
+
+```go
+func HandleMentionAward(ctx *router.HandlerContext) error {
+    // ctx.Event  — the incoming Slack event
+    // ctx.Client — slackclient.Client (injected; never instantiated inside the handler)
+    // ctx.DB     — *gorm.DB
+    // ctx.Config — plugin config struct
+}
+```
+
+`router.Router`, `router.Route`, and `slack.Client` are **not** accepted as separate positional parameters. All dependencies arrive through `HandlerContext`.
+
+### Key Design Decisions
+
+**`internal/` sub-packages over a flat root package**
+The plugin has enough distinct concerns (parsing, ledger writes, eligibility, awards, leaderboard, Slack I/O) that a flat package would conflate them and make table-driven unit tests harder to scope. Sub-packages enforce clear dependency direction: `handlers` imports `parser`, `eligibility`, and `ledger`; nothing in `internal/` imports `plugin/`.
+
+**`plugin/` as the only public API surface**
+Consuming bots call `plugin.Register(bot)` and nothing else. All internal wiring (route registration, scheduler hooks, integration guards) lives inside `plugin.go`. This keeps the import surface minimal and lets internals change without breaking consumers.
+
+**`slackclient.Client` interface**
+A thin interface wrapping `*slack.Client` methods used by this plugin (e.g., `PostMessage`, `GetUsersInfo`). Handlers accept the interface, never the concrete `*slack.Client`, so tests can inject a mock without a live Slack token.
+
+**Idempotency key formats**
+| Source | Key format |
+|---|---|
+| Message mention award | `mention:{workspace_id}:{event_ts}:{recipient_user_id}` |
+| Slash command award | `cmd:{workspace_id}:{command_id}:{recipient_user_id}` |
+| Spam-report award | `spam_report:{workspace_id}:{report_id}:{reporter_user_id}` |
+| Monthly active-user award | `monthly:{workspace_id}:{year_month}:{user_id}` |
+
+All keys are stored on the `Transaction` row; a unique index prevents duplicate inserts.
+
+**Optional integrations via feature flags in `main.go`**
+`main.go` reads config and conditionally calls `plugin.WithSpamReports(...)`, `plugin.WithScheduler(...)`, and `plugin.WithChatAdapters(...)` before `plugin.Register(bot)`. When a flag is `false` the integration hook is never registered; the plugin compiles and runs without the optional dependency present.
+
+### `go.mod` Dependencies
+
+```
+module github.com/gadget-bot/gadget-plugin-engagement-ledger
+
+go 1.25
+
+require (
+    github.com/gadget-bot/gadget       v0.8.1
+    github.com/slack-go/slack          v0.18.0
+    gorm.io/gorm                       v1.31.1
+    gorm.io/driver/mysql               v1.6.0
+    gorm.io/driver/sqlite              v1.6.0   // test / local dev only
+)
+```
+
+### Testing Approach
+
+| Layer | What is tested | Tool |
+|---|---|---|
+| `internal/parser` | Mention regex, space variants, dedupe, no false positives | Plain `go test` table-driven |
+| `internal/ledger` | Idempotent writes, balance upserts, duplicate key rejection | `go test` with SQLite in-memory |
+| `internal/eligibility` | All exclusion rules, edge cases | Plain `go test` table-driven |
+| `internal/awards` | Monthly boundary logic, point calculation, timezone modes | `go test` with SQLite in-memory |
+| Route handlers | Full request → response cycle | `gadgettest.Dispatcher` with mock `slackclient.Client` |
+
+`gadgettest.Dispatcher` drives a handler through the full Gadget route pipeline without a live Slack connection, allowing assertion on posted messages and written transactions in a single test.
