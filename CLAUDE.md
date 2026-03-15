@@ -31,7 +31,7 @@ go test -v -run TestFunctionName ./pkg/...
 
 **Always prefer `make` targets over calling `go` commands directly.** Only fall back to raw `go` commands when no suitable make target exists (e.g., running a single test).
 
-Run `go build ./...` and `go test ./...` after any code changes before committing.
+Run `make build` and `make test` after any code changes before committing.
 
 ## Architecture
 
