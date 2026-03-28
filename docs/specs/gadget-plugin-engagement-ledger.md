@@ -5,14 +5,12 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
 
 ## Standalone and Optional Integrations
 - Operates standalone with direct command/API input.
-- Optionally registers recurring jobs with `gadget-plugin-scheduler` (required for monthly awards and weekly leaderboard).
-- Optionally receives normalized chat events from `gadget-plugin-chat-adapters`.
+- Optionally registers recurring jobs with `gadget-plugin-scheduler` (required for monthly awards and weekly leaderboard). _(v3)_
+- Optionally receives normalized chat events from `gadget-plugin-chat-adapters`. _(v3)_
 
 ## v1 Functional Requirements
 1. Maintain immutable point transactions and derived balances.
-2. Support one-point awards via:
-   - mention syntax: `@user++` and `@user ++` (space optional)
-   - slash command route (prefix-configurable)
+2. Support one-point awards via mention syntax: `@user++` and `@user ++` (space optional).
 3. Support multiple recipients in one message; if a recipient appears more than once, award once.
 4. Point awards are net-neutral transfers: sender balance decreases by 1, recipient balance increases by 1. Starting balance for all users is 0. Awards are rejected if the sender has insufficient balance.
 5. Reject and do not write transactions for:
@@ -40,8 +38,6 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
     - requires `integrations.scheduler.enabled: true`
 
 ## v1 Configuration
-- `commands.mode`: `top_level | subcommand`
-- `commands.prefix`: string (known prefix namespace)
 - `feedback.reaction`: string emoji name, default `+1`; posted as a reaction to the triggering message on successful award
 - `monthly_award.enabled`: boolean
 - `monthly_award.points`: integer, default `10`
@@ -59,53 +55,62 @@ Emitted event schemas are deferred to v2. The event system is designed to be add
 All writes must be idempotent by `(event_id, source_id)` or equivalent dedupe key.
 
 ## Non-Goals in v1
-- Reaction-based upvote flow.
-- Collusion detection and enforcement.
-- Moderator override tooling.
-- Native event subscription model owned by this plugin.
-- Image leaderboard rendering and dashboard deep-link generation (text publish first; add when UI support exists).
-- Transparency mode (public award announcements and open balance lookups).
-- `gadget-plugin-spam-reports` integration (requires inter-plugin event system not yet available in Gadget).
+- Slash command award route and command mode configuration (`top_level` / `subcommand`). _(v2)_
+- Scheduled jobs: monthly active-user awards, weekly leaderboard publishing. _(v3)_
+- Timezone boundary logic and scheduler integration. _(v3)_
+- Reaction-based upvote flow. _(v2)_
+- Collusion detection and enforcement. _(v2)_
+- Moderator override tooling. _(v2)_
+- Native event subscription model owned by this plugin. _(v2)_
+- Image leaderboard rendering and dashboard deep-link generation. _(v3)_
+- Transparency mode (public award announcements and open balance lookups). _(v2)_
+- `gadget-plugin-spam-reports` integration (requires inter-plugin event system not yet available in Gadget). _(v2)_
 
 ## v2 Targets
+- Slash command award route with configurable `top_level` and `subcommand` modes.
 - Reaction-based upvotes.
 - Collusion detection signals.
 - Moderator override tools (reverse/freeze/exclude).
 - Native event subscription model.
+- Transparency mode: `transparency.enabled` config flag; bot posts a public channel message on each award and allows any member to query another member's balance.
+- `gadget-plugin-spam-reports` integration: consume `spam.report.resolved` and award the first reporter on successful removal. Blocked on Gadget inter-plugin event system.
+
+## v3 Targets
+- Monthly active-user awards with configurable points and timezone boundary logic.
+- Weekly per-workspace leaderboard publishing to a configurable channel.
+- Active-user activity tracking via message event listener and optional `gadget-plugin-chat-adapters` source.
 - Lurker exclusion heuristics beyond baseline activity checks (e.g. last-login signals via `team.accessLogs`).
 - Image leaderboard publishing with dashboard link.
 - Define and publish `engagement.points.awarded` event schema.
 - Define and publish `engagement.leaderboard.generated` event schema.
-- Transparency mode: `transparency.enabled` config flag; bot posts a public channel message on each award and allows any member to query another member's balance.
-- `gadget-plugin-spam-reports` integration: consume `spam.report.resolved` and award the first reporter on successful removal. Blocked on Gadget inter-plugin event system.
 
 ## Extractable Issues
 1. **Plugin scaffolding: `plugin.go`, config struct, `slackclient.Client` interface, `main.go` wiring**
-   Milestone: `v1-core-engagement`
+   Milestone: `v1-core`
 2. **Define ledger schema and idempotent write path**
-   Milestone: `v1-core-engagement`
+   Milestone: `v1-core`
 3. **Implement mention parser for `@user++` and `@user ++` with recipient dedupe**
-   Milestone: `v1-core-engagement`
-4. **Implement command routing with configurable `top_level` and `subcommand` modes**
-   Milestone: `v1-core-engagement`
-5. **Enforce eligibility rules (self/DM/cross-workspace/suspended/bot/edit exclusions)**
-   Milestone: `v1-core-engagement`
-6. **Add playful Penny responses for `--` and attempts to award Penny**
-   Milestone: `v1-core-engagement`
-7. **Track active-user activity via message event listener**
-   Milestone: `v1-core-engagement`
-8. **Implement monthly award job with timezone boundary logic**
-   Milestone: `v1-core-engagement`
-9. **Implement weekly per-workspace leaderboard publishing to configurable channel**
-   Milestone: `v1-core-engagement`
+   Milestone: `v1-core`
+4. **Enforce eligibility rules (self/DM/cross-workspace/suspended/bot/edit exclusions)**
+   Milestone: `v1-core`
+5. **Add playful Penny responses for `--` and attempts to award Penny**
+   Milestone: `v1-core`
+6. **Track active-user activity via message event listener**
+   Milestone: `v3-scheduling`
+7. **Implement monthly award job with timezone boundary logic**
+   Milestone: `v3-scheduling`
+8. **Implement weekly per-workspace leaderboard publishing to configurable channel**
+   Milestone: `v3-scheduling`
+9. **Implement slash command award route with configurable `top_level` and `subcommand` modes**
+   Milestone: `v2-controls`
 10. **Consume `spam.report.resolved` optionally and award first reporter on successful removal**
-    Milestone: `v2-advanced-controls` _(blocked on Gadget inter-plugin event system)_
+    Milestone: `v2-controls` _(blocked on Gadget inter-plugin event system)_
 11. **Investigate giver rate limiting strategy**
-    Milestone: `v2-advanced-controls`
+    Milestone: `v2-controls`
 12. **Add collusion detection signals and moderator override controls**
-    Milestone: `v2-advanced-controls`
+    Milestone: `v2-controls`
 13. **Add reaction-based upvotes and native event subscription model**
-    Milestone: `v2-advanced-controls`
+    Milestone: `v2-controls`
 
 ## Recommended Package Structure
 
@@ -133,7 +138,6 @@ gadget-plugin-engagement-ledger/
 │   │   └── publisher.go             # Weekly leaderboard formatting and Slack publish
 │   ├── handlers/
 │   │   ├── mention.go               # HandlerContext handler: parses message, awards points, posts feedback
-│   │   ├── command.go               # HandlerContext handler: slash-command award route
 │   │   └── quip.go                  # HandlerContext handler: playful responses for -- and bot-award attempts
 │   └── slackclient/
 │       └── client.go                # slack.Client wrapper interface for dependency injection

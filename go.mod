@@ -1,6 +1,6 @@
 module github.com/gadget-bot/gadget-plugin-engagement-ledger
 
-go 1.25
+go 1.26
 
 require (
 	github.com/gadget-bot/gadget v0.8.1
