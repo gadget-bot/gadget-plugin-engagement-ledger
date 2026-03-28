@@ -1,7 +1,7 @@
 # gadget-plugin-engagement-ledger Specification
 
 ## Purpose
-Provide a standalone engagement points system with an immutable ledger, user-to-user transfers, monthly activity awards, and per-workspace leaderboards.
+Provide a standalone engagement points system with an immutable ledger and user-to-user point transfers via mention syntax.
 
 ## Standalone and Optional Integrations
 - Operates standalone with direct command/API input.
@@ -24,29 +24,9 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
 8. `--` never removes points; trigger playful/quippy consumer response only.
 9. Attempting to award the consuming bot triggers playful/quippy consumer response only.
 10. Protect against double-credit with idempotency keys.
-11. Run monthly active-user awards:
-    - default `10` points per active user, configurable by plugin consumer
-    - active user = posted top-level message or thread reply in channels in that month where the bot is a member
-    - inactive users receive nothing
-    - timezone boundary mode configurable per workspace: `workspace_local` or `utc`
-    - requires `integrations.scheduler.enabled: true`; if the scheduler integration is disabled, monthly awards do not run
-    - activity is tracked by the plugin's own message event listener; when `integrations.chat_adapters.enabled: true`, normalized events from `gadget-plugin-chat-adapters` serve as an additional source; channel membership filtering is naturally enforced by Slack's event delivery model
-12. Publish weekly leaderboard per workspace to a configurable channel:
-    - publishes two ranked top-10 lists: (1) points received from peers (monthly bot grants excluded), (2) points given to other members
-    - each entry shows rank, display name, and point count
-    - default schedule: `0 8 * * 1` (Monday at 08:00 UTC)
-    - requires `integrations.scheduler.enabled: true`
 
 ## v1 Configuration
 - `feedback.reaction`: string emoji name, default `+1`; posted as a reaction to the triggering message on successful award
-- `monthly_award.enabled`: boolean
-- `monthly_award.points`: integer, default `10`
-- `monthly_award.timezone_mode`: `workspace_local | utc`
-- `leaderboard.enabled`: boolean
-- `leaderboard.channel_id`: string
-- `leaderboard.schedule`: string (cron expression), default `0 8 * * 1` (Monday at 08:00 UTC)
-- `integrations.scheduler.enabled`: boolean
-- `integrations.chat_adapters.enabled`: boolean
 
 ## Events and API Contracts
 ### Emitted
@@ -127,15 +107,11 @@ gadget-plugin-engagement-ledger/
 │   ├── parser/
 │   │   └── mention.go               # Parse @user++ / @user ++ from message text; returns deduplicated recipient list
 │   ├── ledger/
-│   │   ├── models.go                # GORM models: Transaction, Balance, ActiveUserRecord
+│   │   ├── models.go                # GORM models: Transaction, Balance
 │   │   ├── writer.go                # Idempotent write path; upserts Balance after each Transaction insert
-│   │   └── reader.go                # Leaderboard and balance queries
+│   │   └── reader.go                # Balance queries
 │   ├── eligibility/
 │   │   └── rules.go                 # Enforce self/DM/cross-workspace/suspended/bot/edit exclusion rules
-│   ├── awards/
-│   │   └── monthly.go               # Monthly active-user award job; timezone boundary logic
-│   ├── leaderboard/
-│   │   └── publisher.go             # Weekly leaderboard formatting and Slack publish
 │   ├── handlers/
 │   │   ├── mention.go               # HandlerContext handler: parses message, awards points, posts feedback
 │   │   └── quip.go                  # HandlerContext handler: playful responses for -- and bot-award attempts
@@ -164,7 +140,7 @@ func HandleMentionAward(ctx *router.HandlerContext) error {
 ### Key Design Decisions
 
 **`internal/` sub-packages over a flat root package**
-The plugin has enough distinct concerns (parsing, ledger writes, eligibility, awards, leaderboard, Slack I/O) that a flat package would conflate them and make table-driven unit tests harder to scope. Sub-packages enforce clear dependency direction: `handlers` imports `parser`, `eligibility`, and `ledger`; nothing in `internal/` imports `plugin/`.
+The plugin has enough distinct concerns (parsing, ledger writes, eligibility, Slack I/O) that a flat package would conflate them and make table-driven unit tests harder to scope. Sub-packages enforce clear dependency direction: `handlers` imports `parser`, `eligibility`, and `ledger`; nothing in `internal/` imports `plugin/`.
 
 **`plugin/` as the only public API surface**
 Consuming bots call `plugin.Register(bot)` and nothing else. All internal wiring (route registration, scheduler hooks, integration guards) lives inside `plugin.go`. This keeps the import surface minimal and lets internals change without breaking consumers.
@@ -176,14 +152,14 @@ A thin interface wrapping `*slack.Client` methods used by this plugin (e.g., `Po
 | Source | Key format |
 |---|---|
 | Message mention award | `mention:{workspace_id}:{event_ts}:{recipient_user_id}` |
-| Slash command award | `cmd:{workspace_id}:{command_id}:{recipient_user_id}` |
-| Spam-report award | `spam_report:{workspace_id}:{report_id}:{reporter_user_id}` |
-| Monthly active-user award | `monthly:{workspace_id}:{year_month}:{user_id}` |
+| Slash command award _(v2)_ | `cmd:{workspace_id}:{command_id}:{recipient_user_id}` |
+| Spam-report award _(v2)_ | `spam_report:{workspace_id}:{report_id}:{reporter_user_id}` |
+| Monthly active-user award _(v3)_ | `monthly:{workspace_id}:{year_month}:{user_id}` |
 
 All keys are stored on the `Transaction` row; a unique index prevents duplicate inserts.
 
-**Optional integrations via feature flags in `main.go`**
-`main.go` reads config and conditionally calls `plugin.WithSpamReports(...)`, `plugin.WithScheduler(...)`, and `plugin.WithChatAdapters(...)` before `plugin.Register(bot)`. When a flag is `false` the integration hook is never registered; the plugin compiles and runs without the optional dependency present.
+**Optional integrations via functional options _(v2/v3)_**
+`main.go` will conditionally pass `plugin.With*` options to `plugin.Register(bot, cfg, opts...)` when integrations are enabled. When no options are passed the plugin compiles and runs without any optional dependency present. No options exist in v1.
 
 ### `go.mod` Dependencies
 
@@ -208,7 +184,6 @@ require (
 | `internal/parser` | Mention regex, space variants, dedupe, no false positives | Plain `go test` table-driven |
 | `internal/ledger` | Idempotent writes, balance upserts, duplicate key rejection | `go test` with SQLite in-memory |
 | `internal/eligibility` | All exclusion rules, edge cases | Plain `go test` table-driven |
-| `internal/awards` | Monthly boundary logic, point calculation, timezone modes | `go test` with SQLite in-memory |
 | Route handlers | Full request → response cycle | `gadgettest.Dispatcher` with mock `slackclient.Client` |
 
 `gadgettest.Dispatcher` drives a handler through the full Gadget route pipeline without a live Slack connection, allowing assertion on posted messages and written transactions in a single test.
