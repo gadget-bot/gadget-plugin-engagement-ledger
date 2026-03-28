@@ -5,8 +5,7 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
 
 ## Standalone and Optional Integrations
 - Operates standalone with direct command/API input.
-- Optionally consumes events from `gadget-plugin-spam-reports`.
-- Optionally registers recurring jobs with `gadget-plugin-scheduler`.
+- Optionally registers recurring jobs with `gadget-plugin-scheduler` (required for monthly awards and weekly leaderboard).
 - Optionally receives normalized chat events from `gadget-plugin-chat-adapters`.
 
 ## v1 Functional Requirements
@@ -37,7 +36,7 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
 12. Publish weekly leaderboard per workspace to a configurable channel:
     - publishes two ranked top-10 lists: (1) points received from peers (monthly bot grants excluded), (2) points given to other members
     - each entry shows rank, display name, and point count
-    - default schedule: Monday at 08:00 UTC
+    - default schedule: `0 8 * * 1` (Monday at 08:00 UTC)
     - requires `integrations.scheduler.enabled: true`
 
 ## v1 Configuration
@@ -49,19 +48,11 @@ Provide a standalone engagement points system with an immutable ledger, user-to-
 - `monthly_award.timezone_mode`: `workspace_local | utc`
 - `leaderboard.enabled`: boolean
 - `leaderboard.channel_id`: string
-- `leaderboard.post_day`: string, default `monday`
-- `leaderboard.post_time_utc`: string (HH:MM), default `08:00`
-- `transparency.enabled`: boolean — _definition TBD_
-- `integrations.spam_reports.enabled`: boolean
+- `leaderboard.schedule`: string (cron expression), default `0 8 * * 1` (Monday at 08:00 UTC)
 - `integrations.scheduler.enabled`: boolean
 - `integrations.chat_adapters.enabled`: boolean
 
 ## Events and API Contracts
-### Consumed (optional)
-- `spam.report.resolved`
-  - Required fields: `event_id`, `workspace_id`, `report_id`, `removed`, `first_reporter_user_id`
-  - Behavior: if `removed=true`, award first reporter exactly once.
-
 ### Emitted
 Emitted event schemas are deferred to v2. The event system is designed to be additive: event emission hooks will be inserted into write paths without requiring structural changes when schemas are defined.
 
@@ -73,6 +64,8 @@ All writes must be idempotent by `(event_id, source_id)` or equivalent dedupe ke
 - Moderator override tooling.
 - Native event subscription model owned by this plugin.
 - Image leaderboard rendering and dashboard deep-link generation (text publish first; add when UI support exists).
+- Transparency mode (public award announcements and open balance lookups).
+- `gadget-plugin-spam-reports` integration (requires inter-plugin event system not yet available in Gadget).
 
 ## v2 Targets
 - Reaction-based upvotes.
@@ -83,41 +76,36 @@ All writes must be idempotent by `(event_id, source_id)` or equivalent dedupe ke
 - Image leaderboard publishing with dashboard link.
 - Define and publish `engagement.points.awarded` event schema.
 - Define and publish `engagement.leaderboard.generated` event schema.
+- Transparency mode: `transparency.enabled` config flag; bot posts a public channel message on each award and allows any member to query another member's balance.
+- `gadget-plugin-spam-reports` integration: consume `spam.report.resolved` and award the first reporter on successful removal. Blocked on Gadget inter-plugin event system.
 
 ## Extractable Issues
-1. **Define ledger schema and idempotent write path**  
-   Milestone: `v1-core-engagement`  
-   Labels: `type:feature`, `area:engagement`, `priority:p0`, `standalone`
-2. **Implement mention parser for `@user++` and `@user ++` with recipient dedupe**  
-   Milestone: `v1-core-engagement`  
-   Labels: `type:feature`, `area:engagement`, `priority:p0`
-3. **Implement command routing with configurable `top_level` and `subcommand` modes**  
-   Milestone: `v1-core-engagement`  
-   Labels: `type:feature`, `area:engagement`, `type:api`, `priority:p0`
-4. **Enforce eligibility rules (self/DM/cross-workspace/suspended/bot/edit exclusions)**  
-   Milestone: `v1-core-engagement`  
-   Labels: `type:feature`, `area:engagement`, `priority:p0`
-5. **Add playful Penny responses for `--` and attempts to award Penny**  
-   Milestone: `v1-core-engagement`  
-   Labels: `type:feature`, `area:engagement`, `priority:p1`
-6. **Implement monthly active-user awards with configurable points and timezone mode**  
-   Milestone: `v1-core-engagement`  
-   Labels: `type:feature`, `area:engagement`, `priority:p0`
-7. **Implement weekly per-workspace leaderboard publishing to configurable channel**  
-   Milestone: `v1-optional-integrations`  
-   Labels: `type:feature`, `area:engagement`, `priority:p1`, `integration:optional`
-8. **Consume `spam.report.resolved` optionally and award first reporter on successful removal**  
-   Milestone: `v1-optional-integrations`  
-   Labels: `type:feature`, `area:engagement`, `area:spam`, `integration:optional`, `priority:p0`
-9. **Investigate giver rate limiting strategy**  
-   Milestone: `v2-advanced-controls`  
-   Labels: `type:feature`, `area:engagement`, `priority:p1`
-10. **Add collusion detection signals and moderator override controls**  
-    Milestone: `v2-advanced-controls`  
-    Labels: `type:feature`, `area:engagement`, `priority:p1`
-11. **Add reaction-based upvotes and native event subscription model**
+1. **Plugin scaffolding: `plugin.go`, config struct, `slackclient.Client` interface, `main.go` wiring**
+   Milestone: `v1-core-engagement`
+2. **Define ledger schema and idempotent write path**
+   Milestone: `v1-core-engagement`
+3. **Implement mention parser for `@user++` and `@user ++` with recipient dedupe**
+   Milestone: `v1-core-engagement`
+4. **Implement command routing with configurable `top_level` and `subcommand` modes**
+   Milestone: `v1-core-engagement`
+5. **Enforce eligibility rules (self/DM/cross-workspace/suspended/bot/edit exclusions)**
+   Milestone: `v1-core-engagement`
+6. **Add playful Penny responses for `--` and attempts to award Penny**
+   Milestone: `v1-core-engagement`
+7. **Track active-user activity via message event listener**
+   Milestone: `v1-core-engagement`
+8. **Implement monthly award job with timezone boundary logic**
+   Milestone: `v1-core-engagement`
+9. **Implement weekly per-workspace leaderboard publishing to configurable channel**
+   Milestone: `v1-core-engagement`
+10. **Consume `spam.report.resolved` optionally and award first reporter on successful removal**
+    Milestone: `v2-advanced-controls` _(blocked on Gadget inter-plugin event system)_
+11. **Investigate giver rate limiting strategy**
     Milestone: `v2-advanced-controls`
-    Labels: `type:feature`, `area:engagement`, `priority:p1`
+12. **Add collusion detection signals and moderator override controls**
+    Milestone: `v2-advanced-controls`
+13. **Add reaction-based upvotes and native event subscription model**
+    Milestone: `v2-advanced-controls`
 
 ## Recommended Package Structure
 
@@ -198,7 +186,7 @@ All keys are stored on the `Transaction` row; a unique index prevents duplicate 
 ```
 module github.com/gadget-bot/gadget-plugin-engagement-ledger
 
-go 1.25
+go 1.26
 
 require (
     github.com/gadget-bot/gadget       v0.8.1
