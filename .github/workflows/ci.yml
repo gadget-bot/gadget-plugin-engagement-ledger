@@ -10,8 +10,24 @@ permissions:
   contents: read
 
 jobs:
+  check-go:
+    runs-on: ubuntu-latest
+    outputs:
+      has-go: ${{ steps.check.outputs.has-go }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: check
+        run: |
+          if [ -f "go.mod" ]; then
+            echo "has-go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-go=false" >> "$GITHUB_OUTPUT"
+          fi
+
   lint:
     runs-on: ubuntu-latest
+    needs: check-go
+    if: needs.check-go.outputs.has-go == 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
@@ -28,6 +44,8 @@ jobs:
         go: ['1.25', '1.26']
     name: 'test (go ${{ matrix.go }})'
     runs-on: ubuntu-latest
+    needs: check-go
+    if: needs.check-go.outputs.has-go == 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
@@ -38,7 +56,8 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [check-go, lint, test]
+    if: needs.check-go.outputs.has-go == 'true'
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v6
