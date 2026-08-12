@@ -65,32 +65,38 @@ All writes must be idempotent by `(event_id, source_id)` or equivalent dedupe ke
 - Define and publish `engagement.leaderboard.generated` event schema.
 
 ## Extractable Issues
-1. **Plugin scaffolding: `plugin.go`, config struct, `slackclient.Client` interface, `main.go` wiring**
-   Milestone: `v1-core`
-2. **Define ledger schema and idempotent write path**
-   Milestone: `v1-core`
-3. **Implement mention parser for `@user++` and `@user ++` with recipient dedupe**
-   Milestone: `v1-core`
-4. **Enforce eligibility rules (self/DM/cross-workspace/suspended/bot/edit exclusions)**
-   Milestone: `v1-core`
-5. **Add playful Penny responses for `--` and attempts to award Penny**
-   Milestone: `v1-core`
-6. **Track active-user activity via message event listener**
-   Milestone: `v3-scheduling`
-7. **Implement monthly award job with timezone boundary logic**
-   Milestone: `v3-scheduling`
-8. **Implement weekly per-workspace leaderboard publishing to configurable channel**
-   Milestone: `v3-scheduling`
-9. **Implement slash command award route with configurable `top_level` and `subcommand` modes**
-   Milestone: `v2-controls`
-10. **Consume `spam.report.resolved` optionally and award first reporter on successful removal**
-    Milestone: `v2-controls` _(blocked on Gadget inter-plugin event system)_
-11. **Investigate giver rate limiting strategy**
-    Milestone: `v2-controls`
-12. **Add collusion detection signals and moderator override controls**
-    Milestone: `v2-controls`
-13. **Add reaction-based upvotes and native event subscription model**
-    Milestone: `v2-controls`
+Unordered; each entry names its GitHub issue directly rather than relying on
+list position, since position and issue number drift out of sync as issues
+get filed, re-scoped, or renumbered. Entries with no issue number yet are
+unfiled — file one before starting work rather than assuming the position
+below implies an ID.
+
+- **Plugin scaffolding: `plugin.go`, config struct, `slackclient.Client` interface, `main.go` wiring** — [#2](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/2)
+  Milestone: `v1-core`
+- **Define ledger schema and idempotent write path** — [#3](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/3)
+  Milestone: `v1-core`
+- **Implement mention parser for `@user++` and `@user ++` with recipient dedupe** — [#4](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/4)
+  Milestone: `v1-core`
+- **Enforce eligibility rules (self/DM/cross-workspace/suspended/bot/edit exclusions)** — [#6](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/6)
+  Milestone: `v1-core`
+- **Add playful Penny responses for `--` and attempts to award Penny** — [#7](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/7)
+  Milestone: `v1-core`
+- **Track active-user activity via message event listener** — [#8](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/8)
+  Milestone: `v3-scheduling`
+- **Implement monthly award job with timezone boundary logic** — [#9](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/9)
+  Milestone: `v3-scheduling`
+- **Implement weekly per-workspace leaderboard publishing to configurable channel** — [#10](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/10)
+  Milestone: `v3-scheduling`
+- **Implement slash command award route with configurable `top_level` and `subcommand` modes** — [#5](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/5)
+  Milestone: `v2-controls`
+- **Consume `spam.report.resolved` optionally and award first reporter on successful removal** — [#11](https://github.com/gadget-bot/gadget-plugin-engagement-ledger/issues/11)
+  Milestone: `v2-controls` _(blocked on Gadget inter-plugin event system)_
+- **Investigate giver rate limiting strategy** — _unfiled_
+  Milestone: `v2-controls`
+- **Add collusion detection signals and moderator override controls** — _unfiled_
+  Milestone: `v2-controls`
+- **Add reaction-based upvotes and native event subscription model** — _unfiled_
+  Milestone: `v2-controls`
 
 ## Recommended Package Structure
 

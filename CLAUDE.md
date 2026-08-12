@@ -72,3 +72,10 @@ When opening issues:
 - Always apply an issue type and the best-fitting label
 - Scan existing issues to identify relationships (sub-issues, duplicates, related issues)
 - Ask before changing existing relationships
+
+## Documenting Planned Work in Specs
+
+When a spec doc (e.g. `docs/specs/*.md`) lists planned/extractable work items, never rely on the list's ordinal position (`1.`, `2.`, ...) to imply a GitHub issue number — position and issue number drift out of sync the moment an item is reordered, re-scoped, or an issue gets filed out of list order. Instead:
+- Once an issue is filed for an item, link it directly on that line (e.g. `— [#4](https://github.com/OWNER/REPO/issues/4)`).
+- For items with no issue yet, mark them explicitly (e.g. `— _unfiled_`) rather than leaving the position to imply one.
+- Prefer an unordered list for this kind of section so there's no numbering to misread as an issue reference in the first place.
