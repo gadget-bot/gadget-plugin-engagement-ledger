@@ -43,8 +43,8 @@ func (p *Plugin) channelMessageRoutes(bot *core.Gadget) []router.ChannelMessageR
 				Priority:    10,
 			},
 			Plugin: func(ctx router.HandlerContext, ev slackevents.MessageEvent, message string) {
-				// TODO(issue #3): implement mention parser for @user++ with recipient dedupe
-				// TODO(issue #4): enforce eligibility rules
+				// TODO(issue #4): implement mention parser for @user++ with recipient dedupe
+				// TODO(issue #6): enforce eligibility rules
 				log.Debug().Str("route", "engagement.award.mention").Msg("stub: @user++ handler")
 			},
 		},
@@ -56,7 +56,7 @@ func (p *Plugin) channelMessageRoutes(bot *core.Gadget) []router.ChannelMessageR
 				Priority:    10,
 			},
 			Plugin: func(ctx router.HandlerContext, ev slackevents.MessageEvent, message string) {
-				// TODO(issue #5): add playful Penny responses for --
+				// TODO(issue #7): add playful Penny responses for --
 				log.Debug().Str("route", "engagement.quip.decrement").Msg("stub: -- quip handler")
 			},
 		},
