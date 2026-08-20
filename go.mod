@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/gadget-bot/gadget v0.9.0
 	github.com/rs/zerolog v1.35.1
-	github.com/slack-go/slack v0.27.0
+	github.com/slack-go/slack v0.29.0
 )
 
 require (
